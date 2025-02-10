@@ -1,0 +1,17 @@
+
+
+# Ignore environment variables
+.env
+services/user_management/.env
+
+# Ignore Python virtual environment
+venv/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore Docker build artifacts
+*.log
+docker-compose.override.yml
