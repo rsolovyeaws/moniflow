@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  metrics_collector:
+    build: ./services/metrics_collector
+    ports:
+      - "8001:8001"
+  
+  alert_service:
+    build: ./services/alert_service
+    ports:
+      - "8002:8002"
+
+  dashboard_service:
+    build: ./services/dashboard_service
+    ports:
+      - "8003:8003"
+
+  user_management:
+    build: ./services/user_management
+    ports:
+      - "8004:8004"
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - metrics_collector
+      - alert_service
+      - dashboard_service
+      - user_management
