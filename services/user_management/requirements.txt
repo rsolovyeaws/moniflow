@@ -1,5 +1,8 @@
 fastapi
 uvicorn
 pydantic
-passlib[bcrypt]
+passlib[argon2,pbkdf2]
 pyjwt
+python-dotenv
+python-multipart
+motor
