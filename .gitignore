@@ -4,6 +4,13 @@
 .env
 services/user_management/.env
 
+# todo lists
+todo.md
+todo.txt
+
+# notes
+notes.md
+
 # Ignore Python virtual environment
 venv/
 
