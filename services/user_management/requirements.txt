@@ -6,3 +6,4 @@ pyjwt
 python-dotenv
 python-multipart
 motor
+pydantic[email]

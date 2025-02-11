@@ -2,9 +2,10 @@ import os
 import jwt
 import datetime
 import logging
+import hashlib
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 from database import users_collection, create_admin_user
@@ -45,6 +46,7 @@ class UserInDB(User):
 class UserRegister(BaseModel):
     username: str
     password: str
+    email: EmailStr
     role: str = "user"
 
 class Token(BaseModel):
@@ -52,12 +54,17 @@ class Token(BaseModel):
     token_type: str
 
 # Utility functions
+def hash_email(email: str) -> str:
+    """Hashes the email using SHA-256 for security."""
+    return hashlib.sha256(email.encode()).hexdigest()
+
 async def get_user(username: str):
     return await users_collection.find_one({"username": username})
 
-async def create_user(username: str, password: str, role: str = "user"):
+async def create_user(username: str, password: str, email: str, role: str = "user"):
     hashed_password = pwd_context.hash(password)
-    user_data = {"username": username, "hashed_password": hashed_password, "role": role}
+    hashed_email = hash_email(email)
+    user_data = {"username": username, "hashed_password": hashed_password, "email": hashed_email, "role": role}
     await users_collection.insert_one(user_data)
 
 def verify_password(plain_password, hashed_password):
@@ -94,10 +101,15 @@ async def register(user: UserRegister, current_user: User = Depends(get_current_
     
     try:
         existing_user = await get_user(user.username)
+        existing_email = await users_collection.find_one({"email": hash_email(user.email)})
+        
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already exists")
         
-        await create_user(user.username, user.password, user.role)
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email already exists")
+        
+        await create_user(user.username, user.password, user.email, user.role)
         return {"message": f"User {user.username} created with role {user.role}"}
     except Exception as e:
         logger.error(f"Error registering user: {e}")
@@ -105,7 +117,10 @@ async def register(user: UserRegister, current_user: User = Depends(get_current_
 
 @app.post("/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await get_user(form_data.username)
+    hashed_email = hash_email(form_data.username)
+    user = await users_collection.find_one({"$or": [{"username": form_data.username}, {"email": hashed_email}]})
+    
+    
     if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
