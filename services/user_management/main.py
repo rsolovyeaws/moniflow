@@ -3,18 +3,19 @@ import jwt
 import datetime
 import logging
 import hashlib
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, Header, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 from dotenv import load_dotenv
-from database import users_collection, create_admin_user
+from database import users_collection, create_admin_user, store_refresh_token, revoke_refresh_token, get_refresh_token
 from contextlib import asynccontextmanager
 
 
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
 
 load_dotenv()
 
@@ -51,6 +52,7 @@ class UserRegister(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
 
 # Utility functions
@@ -72,9 +74,25 @@ def verify_password(plain_password, hashed_password):
 
 def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MINUTES):
     to_encode = data.copy()
-    expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_delta)
+    expire = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=expires_delta)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def create_refresh_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
@@ -129,7 +147,31 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
     
     access_token = create_access_token(data={"sub": user["username"]})
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = create_refresh_token(data={"sub": user["username"]})
+    
+    await store_refresh_token(user["username"], refresh_token)
+    
+    return {"access_token": access_token, "refresh_token": refresh_token,"token_type": "bearer"}
+
+@app.post("/refresh")
+async def refresh_token(refresh_token:str = Header(...)):
+    payload = verify_token(refresh_token)
+    username = payload.get("sub")
+    
+    if not username:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    
+    stored_token = await get_refresh_token(username)
+    if stored_token != refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked token")
+                       
+    new_access_token = create_access_token(data={"sub": username})
+    return {"access_token": new_access_token, "token_type": "bearer"}
+
+@app.post("/logout")
+async def logout(current_user: User = Depends(get_current_user)):
+    await revoke_refresh_token(current_user.username)
+    return {"message": "Logged out successfully"}
 
 @app.get("/users")
 async def list_users(current_user: User = Depends(get_current_user)):
