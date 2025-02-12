@@ -13,6 +13,7 @@ from starlette.responses import JSONResponse
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from httpx import AsyncClient
+import traceback
 
 
 load_dotenv()
@@ -64,6 +65,16 @@ async def rate_limit_exceeded_handler(request, exc):
         status_code=429,
         content={"detail": f"Rate limit exceeded: {str(exc)}"}
     )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Request: {request.method} {request.url} Headers: {dict(request.headers)}")
+    try:
+        response = await call_next(request)
+        return response
+    except Exception:
+        logger.error(f"Error processing request: {traceback.format_exc()}")
+        return JSONResponse(content={"detail": "Internal Server Error"}, status_code=500)
 
 # Microservices URLs
 MICROSERVICES = {
