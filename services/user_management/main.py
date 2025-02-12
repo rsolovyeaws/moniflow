@@ -218,3 +218,9 @@ async def delete_user(username:str, current_user: User = Depends(get_current_use
     
     return {"message": f"User {username} deleted"}
 
+
+@app.get("/slow-response")
+async def slow_response():
+    import asyncio
+    await asyncio.sleep(10)  # Delay for 10 seconds
+    return {"message": "This is a slow response"}

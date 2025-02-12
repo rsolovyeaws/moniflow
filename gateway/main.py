@@ -3,18 +3,19 @@ from fastapi import FastAPI, Request, Response
 import httpx
 import logging
 import os
+import asyncio
 from auth import verify_token
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.responses import JSONResponse
-from starlette.requests import Request as StarletteRequest
 from dotenv import load_dotenv
 
 
 load_dotenv()
 
 GATEWAY_RATE_LIMIT=os.getenv("GATEWAY_RATE_LIMIT", "10")
+REQUEST_TIMEOUT_SEC = int(os.getenv("REQUEST_TIMEOUT_SEC", 5))
 limiter = Limiter(key_func=get_remote_address)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", force=True)
@@ -84,23 +85,43 @@ async def forward_request(service: str, path: str, request: Request, token_paylo
 
     async with httpx.AsyncClient() as client:
         headers.pop("content-length", None)
-        
-        response = await client.request(
-            method,
-            url,
-            headers=headers,
-            params=request.query_params,
-            json=data if "application/json" in content_type else None,
-            data=data if "application/x-www-form-urlencoded" in content_type else None,
-        )
-    
-    logger.info(f"Response from {url}: {response.status_code} - {response.text}")
-    
-    return Response(
-        content=response.content,
-        status_code=response.status_code,
-        headers=dict(response.headers),
-    )
+
+        try:
+            # Apply timeout using asyncio.wait_for
+            response = await asyncio.wait_for(
+                client.request(
+                    method,
+                    url,
+                    headers=headers,
+                    params=request.query_params,
+                    json=data if "application/json" in content_type else None,
+                    data=data if "application/x-www-form-urlencoded" in content_type else None,
+                ),
+                timeout=REQUEST_TIMEOUT_SEC
+            )
+
+            logger.info(f"Response from {url}: {response.status_code} - {response.text}")
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+            )
+
+        except asyncio.TimeoutError:
+            logger.error(f"Request to {url} timed out after {REQUEST_TIMEOUT_SEC} seconds")
+            return Response(
+                content='{"error": "Request timed out"}',
+                status_code=504,  # 504 Gateway Timeout
+                media_type="application/json",
+            )
+
+        except httpx.RequestError as e:
+            logger.error(f"Error communicating with {url}: {str(e)}")
+            return Response(
+                content='{"error": "Upstream service unreachable"}',
+                status_code=502,  # 502 Bad Gateway
+                media_type="application/json",
+            )
 
 
 
