@@ -10,6 +10,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.responses import JSONResponse
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 
 load_dotenv()
@@ -27,6 +30,15 @@ app = FastAPI()
 
 # Apply rate limiting to FastAPI
 app.state.limiter = limiter
+
+# WIP: Add CORS middleware to allow frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Middleware to catch RateLimitExceeded errors and return 429
 @app.exception_handler(RateLimitExceeded)
@@ -47,9 +59,15 @@ MICROSERVICES = {
 # Endpoints that do not require authentication
 EXCLUDED_PATHS = [
     "user_management/token",
-    "user_management/refresh"
+    "user_management/refresh",
+    "health"
 ]
 
+@app.get("/health", include_in_schema=False)
+@app.get("/health/", include_in_schema=False)
+async def health_check():
+    """Health check endpoint for monitoring."""
+    return JSONResponse(status_code=200, content={"status": "ok", "message": "Gateway is healthy"})
 
 async def forward_request(service: str, path: str, request: Request, token_payload: dict = None):
     """Forward requests to microservices, ensuring proper JSON and form data forwarding."""
@@ -124,11 +142,10 @@ async def forward_request(service: str, path: str, request: Request, token_paylo
             )
 
 
-
 @app.api_route("/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 @limiter.limit(f"{GATEWAY_RATE_LIMIT}/minute") 
 async def proxy_request(service: str, path: str, request: Request):
-    """API Gateway: Debugging request handling (authentication temporarily removed)."""
+    """API Gateway: Debugging request handling."""
     if path.endswith("/"):
         path = path[:-1]
         
@@ -158,9 +175,3 @@ async def proxy_request(service: str, path: str, request: Request):
     token_payload = verify_token(token)  
 
     return await forward_request(service, path, request, token_payload)
-
-
-@app.get("/test-log")
-async def test_log():
-    logger.info("Test log inside FastAPI route")
-    return {"message": "Logging works!"}
