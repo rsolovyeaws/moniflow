@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from http.client import HTTPException
 from fastapi import FastAPI, Request, Response
 import httpx
@@ -11,6 +12,7 @@ from slowapi.util import get_remote_address
 from starlette.responses import JSONResponse
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from httpx import AsyncClient
 
 
 load_dotenv()
@@ -21,10 +23,27 @@ limiter = Limiter(key_func=get_remote_address)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", force=True)
 logger = logging.getLogger(__name__)
-
 logger.info("API Gateway Starting...") 
 
-app = FastAPI()
+# Store the shared HTTPX client
+http_client = None  
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event for setting up and tearing down resources."""
+    global http_client
+    http_client = httpx.AsyncClient()
+    logger.info("HTTPX connection pool initialized")
+    
+    yield 
+    
+    await http_client.aclose()
+    logger.info("HTTPX connection pool closed")
+
+
+app = FastAPI(lifespan=lifespan)
+
+client = AsyncClient()
 
 # Apply rate limiting to FastAPI
 app.state.limiter = limiter
@@ -99,11 +118,10 @@ async def forward_request(service: str, path: str, request: Request, token_paylo
 
     logger.info(f"Forwarding {method} request to {url} with headers: {headers} and data: {data}")
 
-    async with httpx.AsyncClient() as client:
+    async with http_client as client:
         headers.pop("content-length", None)
 
         try:
-            # Apply timeout using asyncio.wait_for
             response = await asyncio.wait_for(
                 client.request(
                     method,
@@ -127,7 +145,7 @@ async def forward_request(service: str, path: str, request: Request, token_paylo
             logger.error(f"Request to {url} timed out after {REQUEST_TIMEOUT_SEC} seconds")
             return Response(
                 content='{"error": "Request timed out"}',
-                status_code=504,  # 504 Gateway Timeout
+                status_code=504,
                 media_type="application/json",
             )
 
@@ -135,7 +153,7 @@ async def forward_request(service: str, path: str, request: Request, token_paylo
             logger.error(f"Error communicating with {url}: {str(e)}")
             return Response(
                 content='{"error": "Upstream service unreachable"}',
-                status_code=502,  # 502 Bad Gateway
+                status_code=502,
                 media_type="application/json",
             )
 
