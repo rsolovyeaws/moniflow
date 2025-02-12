@@ -1,3 +1,7 @@
 fastapi
+slowapi
 uvicorn
 httpx
+pyjwt
+python-dotenv
+python-multipart

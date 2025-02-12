@@ -129,8 +129,13 @@ async def register(user: UserRegister, current_user: User = Depends(get_current_
         
         await create_user(user.username, user.password, user.email, user.role)
         return {"message": f"User {user.username} created with role {user.role}"}
-    except Exception as e:
+    
+    except HTTPException as e:
         logger.error(f"Error registering user: {e}")
+        raise e
+
+    except Exception as e:
+        logger.error(f"Unexpected error registering user: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.post("/token", response_model=Token)

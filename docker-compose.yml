@@ -30,6 +30,8 @@ services:
 
   user_management:
     build: ./services/user_management
+    volumes:
+      - ./services/user_management:/app
     depends_on:
       - mongo
     environment:
@@ -39,6 +41,8 @@ services:
 
   gateway:
     build: ./gateway
+    volumes:
+      - ./gateway:/app
     ports:
       - "8000:8000"
     depends_on:
@@ -46,6 +50,9 @@ services:
       - alert_service
       - dashboard_service
       - user_management
+    environment:
+      - SECRET_KEY=your_super_secret_key
+      - ALGORITHM=HS256
 
 volumes:
   mongo_data:
