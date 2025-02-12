@@ -13,8 +13,6 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
 
-
-
 load_dotenv()
 
 GATEWAY_RATE_LIMIT=os.getenv("GATEWAY_RATE_LIMIT", "10")
