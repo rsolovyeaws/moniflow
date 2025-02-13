@@ -1,10 +1,25 @@
 from fastapi import APIRouter
+from database import write_metric
 
 router = APIRouter()
 
 @router.post("/")
 async def collect_metrics(data: dict):
     """
-    Ingest metrics data.
+    Collects incoming metrics and stores them in InfluxDB.
+    Example request:
+    {
+        "measurement": "cpu_usage",
+        "tags": {"host": "server-1"},
+        "fields": {"usage": 75.3}
+    }
     """
-    return {"status": "success", "data": data}
+    measurement = data.get("measurement", "default_metric")
+    tags = data.get("tags", {})
+    fields = data.get("fields", {})
+
+    if not fields:
+        return {"status": "error", "message": "At least one field is required."}
+
+    write_metric(measurement, fields, tags)
+    return {"status": "success", "message": f"Metric '{measurement}' stored."}

@@ -15,6 +15,8 @@ services:
     build: ./services/metrics_collector
     volumes:
       - ./services/metrics_collector:/app
+    env_file:
+      - .env
     ports:
       - "8001:8001"
   
@@ -53,6 +55,25 @@ services:
     environment:
       - SECRET_KEY=your_super_secret_key
       - ALGORITHM=HS256
+    
+  influxdb:
+    image: influxdb:2.7
+    container_name: moniflow-influxdb
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_ADMIN_USER}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_DB}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN}
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
 
 volumes:
   mongo_data:
+  influxdb_data:
