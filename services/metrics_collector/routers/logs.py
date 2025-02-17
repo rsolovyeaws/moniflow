@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException
-from database import write_log
+from fastapi import APIRouter, HTTPException, Query
+from database import group_logs_by_service, write_log, get_flux_query_for_logs, execute_flux_query
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 
@@ -34,3 +34,25 @@ async def collect_logs(log_entry: LogEntry):
         return {"status": "success", "log": log_entry.model_dump()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/")
+async def get_logs(
+    start: str = Query(None, description="Start timestamp in ISO format or relative time (e.g. -1h)"),
+    end: str = Query(None, description="End timestamp in ISO format or relative time (e.g. -1h)"),
+    level: str = Query(None, description="Log level"),
+    service: str = Query(None, description="Service name")
+):
+    """
+    Retrieve logs data based on query parameters.
+    """
+    filters = {
+        "start": start,
+        "end": end,
+        "level": level,
+        "service": service
+    }
+    flux_query = get_flux_query_for_logs(start, end, level, service)
+    results = execute_flux_query(flux_query)
+    grouped_logs = group_logs_by_service(results)
+    return {"filters": filters, "flux_query": flux_query, "results": results, "grouped_logs": grouped_logs}
+    
