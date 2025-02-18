@@ -240,3 +240,81 @@ def group_logs_by_service_and_level(logs: List[Dict]) -> Dict:
         grouped_logs[service_name][level].append(log)
 
     return {service: dict(levels) for service, levels in grouped_logs.items()}
+
+# metrics
+def get_flux_query_for_metrics(
+    measurement: str,
+    start: str = "-1h",
+    end: str = "now()",
+    tags: Dict[str, str] = None,
+    aggregate: str = None,
+    aggregate_window: str = "1m",
+    limit: int = 1000
+) -> str:
+    """
+    Generate a Flux query to fetch metrics from InfluxDB with optional filtering and aggregation.
+    """
+    # Determine if `start` and `end` should be quoted
+    if start and start.startswith("-"):
+        start_value = start
+    else:
+        start_value = f'"{start}"' if start else '"-1h"'
+
+    if end and (end.startswith("-") or end == "now()"):
+        end_value = end
+    else:
+        end_value = f'"{end}"' if end else "now()"
+
+    query = f'from(bucket: "moniflow") |> range(start: {start_value}, stop: {end_value})'
+    query += f' |> filter(fn: (r) => r["_measurement"] == "{measurement}")'
+
+    if tags:
+        for key, value in tags.items():
+            query += f' |> filter(fn: (r) => r["{key}"] == "{value}")'
+            
+    if aggregate:
+            query += f' |> aggregateWindow(every: {aggregate_window}, fn: {aggregate}, createEmpty: false)'
+
+    query += f' |> limit(n: {limit})'
+
+    logger.info(f"Generated Flux query: {query}")
+    return query
+
+def execute_flux_query_for_metrics(query: str) -> List[Dict]:
+    """
+    Executes a Flux query in InfluxDB and returns results as a list of dictionaries.
+    """
+    try:
+        tables = client.query_api().query(query, org=INFLUXDB_ORG)
+        results = []
+
+        for table in tables:
+            for record in table.records:
+                results.append({
+                    "time": record["_time"].isoformat(),
+                    "measurement": record["_measurement"],
+                    "value": record["_value"],
+                    **{key: record[key] for key in record.values.keys() if key not in ["_measurement", "_value", "_time"]}
+                })
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Error executing metrics query: {e}")
+        return []
+
+def group_metrics_by_tags(metrics: List[Dict]) -> Dict:
+    """
+    Groups metrics by relevant tags only, excluding system metadata fields.
+    """
+    system_fields = {"result", "table", "_start", "_stop", "_field"}  # Fields to exclude from the key
+    grouped_metrics = defaultdict(list)
+
+    for metric in metrics:
+        # Extract only relevant tags, ignoring metadata
+        key = tuple((k, v) for k, v in metric.items() if k not in system_fields and k not in ["time", "measurement", "value"])
+        grouped_metrics[key].append(metric)
+
+    # Convert tuple keys to a readable JSON format (avoid using tuples in JSON)
+    return {str(dict(k)): v for k, v in grouped_metrics.items()}  
+ 
