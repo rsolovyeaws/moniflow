@@ -11,7 +11,7 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  metrics_collector:
+  collector:
     build: ./services/metrics_collector
     volumes:
       - ./services/metrics_collector:/app
@@ -48,7 +48,7 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - metrics_collector
+      - collector
       - alert_service
       - dashboard_service
       - user_management

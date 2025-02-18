@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Query
 from database import write_metric
 from typing import Optional
@@ -7,9 +8,12 @@ from database import (
     group_metrics_by_tags
 )
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", force=True)
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
-@router.post("/")
+@router.post("/metrics")
 async def collect_metrics(data: dict):
     """
     Collects incoming metrics and stores them in InfluxDB.
@@ -20,6 +24,8 @@ async def collect_metrics(data: dict):
         "fields": {"usage": 75.3}
     }
     """
+    logger.info(f"collect_metrics data: {data}")
+    
     measurement = data.get("measurement", "default_metric")
     tags = data.get("tags", {})
     fields = data.get("fields", {})
