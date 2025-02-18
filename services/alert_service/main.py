@@ -4,4 +4,4 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"message": "Alert Service Running"}
+    return {"message": "Alert Service Running"} 

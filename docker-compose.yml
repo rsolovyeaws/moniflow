@@ -22,6 +22,8 @@ services:
   
   alert_service:
     build: ./services/alert_service
+    volumes:
+      - ./services/alert_service:/app
     ports:
       - "8002:8002"
 
