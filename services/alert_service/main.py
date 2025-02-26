@@ -15,6 +15,7 @@ app = FastAPI()
 
 class AlertRuleCreate(BaseModel):
     metric_name: str
+    tags: Dict[str, str] = Field(..., min_length=1)
     threshold: float
     duration_value: int = Field(..., gt=0)  # Must be positive
     duration_unit: Literal["seconds", "minutes", "hours"] = (

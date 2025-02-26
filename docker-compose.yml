@@ -1,4 +1,13 @@
 services:
+  redis:
+    image: redis:7
+    container_name: moniflow-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
   mongo:
     image: mongo:6.0
     container_name: moniflow-mongo
@@ -26,6 +35,9 @@ services:
       - ./services/alert_service:/app
     env_file:
       - ./services/alert_service/.env
+    depends_on:
+      - redis
+      - mongo
     ports:
       - "8002:8002"
 
@@ -81,3 +93,4 @@ services:
 volumes:
   mongo_data:
   influxdb_data:
+  redis_data:

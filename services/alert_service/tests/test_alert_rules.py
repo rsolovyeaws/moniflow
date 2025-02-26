@@ -8,6 +8,7 @@ def test_create_alert_success():
     """Successful Alert Rule Creation"""
     payload = {
         "metric_name": "cpu_usage",
+        "tags": {"host": "server1"},
         "threshold": 80.0,
         "duration_value": 5,
         "duration_unit": "minutes",
@@ -21,10 +22,27 @@ def test_create_alert_success():
     assert "rule_id" in response.json()
 
 
+def test_create_alert_no_tag():
+    """Invalid Alert Rule (No Tags)"""
+    payload = {
+        "metric_name": "cpu_usage",
+        "threshold": 80.0,
+        "duration_value": 5,
+        "duration_unit": "minutes",
+        "comparison": ">",
+        "use_recovery_alert": True,
+        "recovery_time_value": 10,
+        "recovery_time_unit": "minutes",
+    }
+    response = client.post("/alerts/", json=payload)
+    assert response.status_code == 422
+
+
 def test_create_alert_invalid_comparison():
     """Invalid Comparison Operator"""
     payload = {
         "metric_name": "cpu_usage",
+        "tags": {"host": "server1"},
         "threshold": 80.0,
         "duration_value": 5,
         "duration_unit": "minutes",
@@ -39,6 +57,7 @@ def test_create_alert_invalid_duration():
     """Invalid Duration (Negative)"""
     payload = {
         "metric_name": "cpu_usage",
+        "tags": {"host": "server1"},
         "threshold": 80.0,
         "duration_value": -5,  # Cannot be negative
         "duration_unit": "minutes",
@@ -53,6 +72,7 @@ def test_create_alert_invalid_recovery_time():
     """Invalid Recovery Time (Negative)"""
     payload = {
         "metric_name": "cpu_usage",
+        "tags": {"host": "server1"},
         "threshold": 80.0,
         "duration_value": 5,
         "duration_unit": "minutes",
@@ -69,6 +89,7 @@ def test_create_alert_default_values():
     """Default Values for Notification Channels & Recipients"""
     payload = {
         "metric_name": "memory_usage",
+        "tags": {"host": "server1"},
         "threshold": 75.0,
         "duration_value": 3,
         "duration_unit": "minutes",
@@ -96,6 +117,7 @@ def test_get_alert_by_id():
     """Retrieve a single alert rule by its ID"""
     payload = {
         "metric_name": "cpu_usage",
+        "tags": {"host": "server1"},
         "threshold": 80.0,
         "duration_value": 5,
         "duration_unit": "minutes",
@@ -134,6 +156,7 @@ def test_delete_alert_by_id():
     """Delete single alert rule by its ID"""
     payload = {
         "metric_name": "cpu_usage",
+        "tags": {"host": "server1"},
         "threshold": 80.0,
         "duration_value": 5,
         "duration_unit": "minutes",

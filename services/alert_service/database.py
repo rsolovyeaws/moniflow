@@ -59,6 +59,7 @@ def convert_to_seconds(value: int, unit: str) -> int:
 
 def create_alert_rule(
     metric_name,
+    tags,
     threshold,
     duration_value,
     duration_unit,
@@ -96,6 +97,7 @@ def create_alert_rule(
 
     rule = {
         "metric_name": metric_name,
+        "tags": tags,
         "threshold": threshold,
         "duration": duration_seconds,
         "comparison": comparison,
