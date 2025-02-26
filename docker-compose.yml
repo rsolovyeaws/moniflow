@@ -24,6 +24,8 @@ services:
     build: ./services/alert_service
     volumes:
       - ./services/alert_service:/app
+    env_file:
+      - ./services/alert_service/.env
     ports:
       - "8002:8002"
 

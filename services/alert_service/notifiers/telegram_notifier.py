@@ -14,6 +14,23 @@ CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 
 class TelegramNotifier(Notifier):
+    """
+    A notifier class for sending alerts via Telegram.
+    Attributes:
+        bot (Bot): An instance of the Telegram Bot initialized with the bot token.
+    Methods:
+        __init__():
+            Initializes the TelegramNotifier with the bot token.
+        send_alert(message: str):
+            Asynchronously sends an alert message to a specified Telegram channel.
+            Args:
+                message (str): The alert message to be sent.
+            Returns:
+                response: The response from the Telegram API if the message is sent successfully.
+            Raises:
+                Exception: If there is an error while sending the message.
+    """
+    
     def __init__(self):
         self.bot = Bot(token=TELEGRAM_BOT_TOKEN)
         

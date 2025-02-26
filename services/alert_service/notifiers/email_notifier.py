@@ -1,6 +1,12 @@
-import smtplib
-from email.mime.text import MIMEText
 from .notifier import Notifier
+import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class EmailNotifier(Notifier):
     """
@@ -18,22 +24,8 @@ class EmailNotifier(Notifier):
                 recipients (list): A list of recipient email addresses.
     """
     
-    def __init__(self, smtp_server, smtp_port, sender_email, sender_password):
-        self.smtp_server = smtp_server
-        self.smtp_port = smtp_port
-        self.sender_email = sender_email
-        self.sender_password = sender_password
+    def __init__(self):
+        pass
 
     def send_alert(self, message: str, recipients: list):
-        msg = MIMEText(message)
-        msg["Subject"] = "🚨 Alert Notification 🚨"
-        msg["From"] = self.sender_email
-        msg["To"] = ", ".join(recipients)
-
-        try:
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.sender_email, self.sender_password)
-                server.sendmail(self.sender_email, recipients, msg.as_string())
-        except Exception as e:
-            print(f"Email sending failed: {e}")
+        pass

@@ -6,3 +6,5 @@ requests
 python-telegram-bot
 pymongo
 python-dotenv
+email-validator
+pytest
