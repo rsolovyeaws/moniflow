@@ -14,8 +14,9 @@ app = FastAPI()
 
 
 class AlertRuleCreate(BaseModel):
-    metric_name: str
+    metric_name: str  # matches measurment
     tags: Dict[str, str] = Field(..., min_length=1)
+    field_name: str  # Matches a field inside `fields`
     threshold: float
     duration_value: int = Field(..., gt=0)  # Must be positive
     duration_unit: Literal["seconds", "minutes", "hours"] = (
@@ -29,6 +30,13 @@ class AlertRuleCreate(BaseModel):
         None, ge=0
     )  # Only used if recovery alerts are enabled
     recovery_time_unit: Literal["seconds", "minutes", "hours"] | None = None
+
+
+class Metric(BaseModel):
+    metric_name: str
+    tags: Dict[str, str] = Field(..., min_length=1)
+    value: float
+    timestamp: str
 
 
 @app.get("/")

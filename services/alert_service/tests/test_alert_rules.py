@@ -9,6 +9,7 @@ def test_create_alert_success():
     payload = {
         "metric_name": "cpu_usage",
         "tags": {"host": "server1"},
+        "field_name": "usage",
         "threshold": 80.0,
         "duration_value": 5,
         "duration_unit": "minutes",
@@ -73,6 +74,24 @@ def test_create_alert_invalid_recovery_time():
     payload = {
         "metric_name": "cpu_usage",
         "tags": {"host": "server1"},
+        "field_name": "usage",
+        "threshold": 80.0,
+        "duration_value": 5,
+        "duration_unit": "minutes",
+        "comparison": ">",
+        "use_recovery_alert": True,
+        "recovery_time_value": -10,
+        "recovery_time_unit": "minutes",
+    }
+    response = client.post("/alerts/", json=payload)
+    assert response.status_code == 422
+
+
+def test_create_alert_invalid_no_field_name():
+    """Invalid no field_name"""
+    payload = {
+        "metric_name": "cpu_usage",
+        "tags": {"host": "server1"},
         "threshold": 80.0,
         "duration_value": 5,
         "duration_unit": "minutes",
@@ -90,6 +109,7 @@ def test_create_alert_default_values():
     payload = {
         "metric_name": "memory_usage",
         "tags": {"host": "server1"},
+        "field_name": "usage",
         "threshold": 75.0,
         "duration_value": 3,
         "duration_unit": "minutes",
@@ -117,6 +137,7 @@ def test_get_alert_by_id():
     """Retrieve a single alert rule by its ID"""
     payload = {
         "metric_name": "cpu_usage",
+        "field_name": "usage",
         "tags": {"host": "server1"},
         "threshold": 80.0,
         "duration_value": 5,
@@ -140,6 +161,8 @@ def test_get_alert_by_id():
 
     # Check that the response contains correct data
     assert rule_data["metric_name"] == payload["metric_name"]
+    assert rule_data["tags"] == payload["tags"]
+    assert rule_data["field_name"] == payload["field_name"]
     assert rule_data["threshold"] == payload["threshold"]
     assert rule_data["comparison"] == payload["comparison"]
     assert rule_data["use_recovery_alert"] == payload["use_recovery_alert"]
@@ -157,6 +180,7 @@ def test_delete_alert_by_id():
     payload = {
         "metric_name": "cpu_usage",
         "tags": {"host": "server1"},
+        "field_name": "usage",
         "threshold": 80.0,
         "duration_value": 5,
         "duration_unit": "minutes",
