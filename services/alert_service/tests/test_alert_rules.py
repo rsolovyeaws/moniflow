@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from main import app
 
@@ -129,3 +128,32 @@ def test_get_alert_by_id():
     invalid_response = client.get("/alerts/invalid_rule_id")
     assert invalid_response.status_code == 404
     assert invalid_response.json()["detail"] == "Alert rule not found"
+
+
+def test_delete_alert_by_id():
+    """Delete single alert rule by its ID"""
+    payload = {
+        "metric_name": "cpu_usage",
+        "threshold": 80.0,
+        "duration_value": 5,
+        "duration_unit": "minutes",
+        "comparison": ">",
+        "use_recovery_alert": True,
+        "recovery_time_value": 10,
+        "recovery_time_unit": "minutes",
+    }
+    create_response = client.post("/alerts/", json=payload)
+    assert create_response.status_code == 200
+    data = create_response.json()
+    assert "rule_id" in data
+
+    rule_id = data["rule_id"]
+
+    # Retrieve the created alert rule
+    get_response = client.delete(f"/alerts/{rule_id}")
+    assert get_response.status_code == 200
+
+    # Check that the rule was deleted
+    get_response = client.get(f"/alerts/{rule_id}")
+    assert get_response.status_code == 404
+    assert get_response.json()["detail"] == "Alert rule not found"

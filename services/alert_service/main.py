@@ -1,6 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from database import create_alert_rule, get_alert_rule_by_id, get_alert_rules
+from database import (
+    create_alert_rule,
+    delete_alert_rule,
+    get_alert_rule_by_id,
+    get_alert_rules,
+)
 from notifiers.telegram_notifier import TelegramNotifier
 from typing import List, Dict, Literal
 from pydantic.fields import Field
@@ -73,6 +78,24 @@ def get_alert(rule_id: str):
 def get_alerts():
     """Retrieve all alert rules from the database."""
     return {"alert_rules": get_alert_rules()}
+
+
+@app.delete("/alerts/{rule_id}")
+def delete_alert(rule_id: str):
+    """
+    Delete an alert rule by its ID.
+    Args:
+        rule_id (str): The ID of the alert rule to delete.
+    Returns:
+        dict: A dictionary containing a success message.
+    Raises:
+        HTTPException: If the alert rule is not found, raises a 404 HTTP exception.
+    """
+
+    result = delete_alert_rule(rule_id)
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Alert rule not found")
+    return {"message": "Alert rule deleted"}
 
 
 @app.get("/bot-test/")

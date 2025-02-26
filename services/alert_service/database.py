@@ -41,6 +41,17 @@ def get_alert_rules():
     return [{**rule, "_id": str(rule["_id"])} for rule in alert_rules.find({})]
 
 
+def delete_alert_rule(rule_id: str):
+    """Delete an alert rule by its ID."""
+    try:
+        object_id = ObjectId(rule_id)
+    except errors.InvalidId:
+        return None
+
+    result = alert_rules.delete_one({"_id": object_id})
+    return result
+
+
 def convert_to_seconds(value: int, unit: str) -> int:
     unit_multipliers = {"seconds": 1, "minutes": 60, "hours": 3600}
     return value * unit_multipliers[unit]
