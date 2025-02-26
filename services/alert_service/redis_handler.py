@@ -1,17 +1,28 @@
 import os
 import redis
 import json
+import logging
 
-# Load environment variables
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-REDIS_DB = int(os.getenv("REDIS_DB", "0"))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
-REDIS_ALERT_EXPIRY = int(
-    os.getenv("REDIS_ALERT_EXPIRY", "300")
-)  # 5 minutes default expiry
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Establish Redis connection
+# REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+# REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+# REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+# REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+REDIS_ALERT_EXPIRY = int(os.getenv("REDIS_ALERT_EXPIRY", "300"))
+
+if os.getenv("TEST_REDIS_HOST"):
+    REDIS_HOST = os.getenv("TEST_REDIS_HOST", "moniflow-test-redis")
+    REDIS_PORT = int(os.getenv("TEST_REDIS_PORT", 6379))
+    REDIS_DB = int(os.getenv("TEST_REDIS_DB", 1))
+    REDIS_PASSWORD = os.getenv("TEST_REDIS_PASSWORD", None)  # Use test password
+else:
+    REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+    REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+    REDIS_DB = int(os.getenv("REDIS_DB", 0))
+    REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)  # Use production password
+
 redis_client = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
@@ -21,14 +32,21 @@ redis_client = redis.Redis(
 )
 
 
-def cache_metric(metric_name: str, value: float, timestamp: str):
+def store_metric_in_cache(metric_data: dict):
     """
-    Cache incoming metric values with a timestamp.
-    Key format: "metric:{metric_name}"
+    Store incoming metric in Redis for processing.
+
+    Redis List: "moniflow:metrics"
+    This will store metrics as a queue for Celery workers to process.
+
+    Args:
+        metric_data (dict): The metric data to store.
     """
-    key = f"metric:{metric_name}"
-    data = {"value": value, "timestamp": timestamp}
-    redis_client.setex(key, REDIS_ALERT_EXPIRY, json.dumps(data))
+    try:
+        redis_client.rpush("moniflow:metrics", json.dumps(metric_data))
+    except redis.RedisError as e:
+        logger.error(f"Redis Error: {e}")
+        raise
 
 
 def get_cached_metric(metric_name: str):

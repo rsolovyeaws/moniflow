@@ -1,4 +1,17 @@
 services:
+  test_redis:
+    image: redis:7
+    container_name: moniflow-test-redis
+    restart: always
+    ports:
+      - "6380:6379"
+    environment:
+      - REDIS_PASSWORD=testpassword
+      - ALLOW_EMPTY_PASSWORD=no
+    command: redis-server --requirepass testpassword
+    volumes:
+      - test_redis_data:/data
+
   redis:
     image: redis:7
     container_name: moniflow-redis
@@ -35,6 +48,7 @@ services:
       - ./services/alert_service:/app
     env_file:
       - ./services/alert_service/.env
+      - ./services/alert_service/.env.test 
     depends_on:
       - redis
       - mongo
@@ -94,3 +108,4 @@ volumes:
   mongo_data:
   influxdb_data:
   redis_data:
+  test_redis_data:

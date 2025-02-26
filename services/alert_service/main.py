@@ -1,5 +1,7 @@
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import redis
 from database import (
     create_alert_rule,
     delete_alert_rule,
@@ -9,6 +11,8 @@ from database import (
 from notifiers.telegram_notifier import TelegramNotifier
 from typing import List, Dict, Literal
 from pydantic.fields import Field
+
+from redis_handler import store_metric_in_cache
 
 app = FastAPI()
 
@@ -33,10 +37,12 @@ class AlertRuleCreate(BaseModel):
 
 
 class Metric(BaseModel):
-    metric_name: str
+    measurement: str
     tags: Dict[str, str] = Field(..., min_length=1)
-    value: float
-    timestamp: str
+    fields: Dict[str, float] = Field(..., min_length=1)
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
 
 @app.get("/")
@@ -107,20 +113,27 @@ def delete_alert(rule_id: str):
     return {"message": "Alert rule deleted"}
 
 
+@app.post("/metrics/")
+async def cache_metric(metric: Metric):
+    """
+    Cache incoming metric values with a timestamp.
+    Key format: "metric:{metric_name}"
+    """
+    metric_dict = metric.model_dump()
+
+    try:
+        store_metric_in_cache(metric_dict)
+    except redis.RedisError:
+        raise HTTPException(
+            status_code=503, detail="Redis is unavailable. Metric not cached."
+        )
+
+    return {"message": "Metric cached"}
+
+
+# TEST DEBUG
 @app.get("/bot-test/")
 async def send_bot_message():
     notifier = TelegramNotifier()
     await notifier.send_alert("Hello, this is a test message")
     return {"message": "Test message sent"}
-
-
-# @app.get("/alerts/")
-# def get_alerts():
-#     return list(alert_rules.find({}, {"_id": 0}))
-
-# @app.delete("/alerts/{rule_id}")
-# def delete_alert(rule_id: str):
-#     result = alert_rules.delete_one({"_id": rule_id})
-#     if result.deleted_count == 0:
-#         raise HTTPException(status_code=404, detail="Alert rule not found")
-#     return {"message": "Alert rule deleted"}

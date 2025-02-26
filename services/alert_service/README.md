@@ -8,13 +8,16 @@
 }
 ```
 
-Users must explicitly create a rule for each tag (e.g., one rule for server-1, another for server-2).
+Users must explicitly create a rule for each tag and field_name(e.g., one rule for server-1, another for server-2).
+
 
 ## Sample rule
 
 ```json
 {
     "metric_name": "cpu_usage",
+    "tags": {"host": "server1"},
+    "field_name": "usage",
     "threshold": 85.0,
     "duration_value": 5,
     "duration_unit": "minutes",

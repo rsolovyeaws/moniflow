@@ -2,7 +2,11 @@ import os
 import pytest
 from pymongo import MongoClient
 from fastapi.testclient import TestClient
+import redis
 from main import app
+from dotenv import load_dotenv
+
+load_dotenv(".env.test")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://admin:password@mongo:27017/moniflow_test")
 TEST_DB_NAME = "moniflow_test"
@@ -35,3 +39,18 @@ def clear_database(test_db):
 def test_client():
     """Provides a FastAPI test client."""
     return TestClient(app)
+
+
+@pytest.fixture(scope="function")
+def test_redis():
+    """Fixture to connect to test Redis and clear it before each test."""
+    redis_client = redis.Redis(
+        host=os.getenv("TEST_REDIS_HOST", "localhost"),
+        port=int(os.getenv("TEST_REDIS_PORT", 6380)),
+        db=int(os.getenv("TEST_REDIS_DB", 1)),
+        password=os.getenv("TEST_REDIS_PASSWORD", "testpassword"),
+        decode_responses=True,
+    )
+    redis_client.flushdb()
+    yield redis_client
+    redis_client.flushdb()
