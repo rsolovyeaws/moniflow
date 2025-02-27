@@ -1,3 +1,4 @@
+Testing is done in the separate redis conatainer
 ## Sample metric
 ```json
 {
