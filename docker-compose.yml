@@ -57,6 +57,20 @@ services:
       - mongo
     ports:
       - "8002:8002"
+    
+  alert_worker:
+    build: ./services/alert_service
+    command: celery -A celery_worker.celery worker --loglevel=info
+    environment:
+      - PYTHONPATH=/app
+    env_file:
+      - ./services/alert_service/.env
+    working_dir: /app
+    volumes:
+      - ./services/alert_service:/app
+    depends_on:
+      - redis
+      - alert_service
 
   dashboard_service:
     build: ./services/dashboard_service
