@@ -22,3 +22,6 @@ __pycache__/
 # Ignore Docker build artifacts
 *.log
 docker-compose.override.yml
+
+services/alert_service/celerybeat-schedule
+.vscode

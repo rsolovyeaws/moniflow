@@ -1,11 +1,11 @@
-import json
 import pytest
-from fastapi.testclient import TestClient
+import time
 import redis
 from main import app
+from fastapi.testclient import TestClient
 from redis_handler import store_metric_in_cache
-from datetime import datetime, timezone
 from unittest.mock import patch
+from redis_handler import parse_timestamp
 
 
 client = TestClient(app)
@@ -24,10 +24,21 @@ def test_store_metric_in_redis(test_redis):
     assert response.status_code == 200
     assert response.json() == {"message": "Metric cached"}
 
-    # Check if metric is stored in Redis
-    redis_data = test_redis.lrange("moniflow:metrics", 0, -1)
-    assert len(redis_data) == 1
-    assert json.loads(redis_data[0]) == metric
+    # Generate expected Redis key
+    redis_key = "moniflow:metrics:cpu:host=server-1:usage"
+
+    # Convert timestamp to expected UNIX format
+    expected_timestamp = int(time.mktime(time.strptime(metric["timestamp"], "%Y-%m-%dT%H:%M:%SZ")))
+
+    # Allow for slight variations (±5 seconds)
+    min_time = expected_timestamp - 5
+    max_time = expected_timestamp + 5
+
+    redis_data = test_redis.zrangebyscore(redis_key, min_time, max_time, withscores=True)
+
+    assert len(redis_data) == 1  # Ensure the metric was stored
+    assert float(redis_data[0][0]) == 90.3  # Ensure stored value matches
+    assert min_time <= int(redis_data[0][1]) <= max_time  # Ensure timestamp is in range
 
 
 def test_store_metric_in_cache(test_redis):
@@ -39,14 +50,23 @@ def test_store_metric_in_cache(test_redis):
         "timestamp": "2025-02-26T12:00:00Z",
     }
 
-    # Call the function that should store data in Redis
     store_metric_in_cache(metric)
 
-    # Retrieve the stored data from Redis
-    redis_data = test_redis.lrange("moniflow:metrics", 0, -1)
+    # Generate expected Redis key
+    redis_key = "moniflow:metrics:cpu:host=server-1:usage"
 
-    assert len(redis_data) == 1  # Ensure that one metric was stored
-    assert json.loads(redis_data[0]) == metric  # Ensure stored metric matches
+    # Convert timestamp to expected UNIX format
+    expected_timestamp = int(time.mktime(time.strptime(metric["timestamp"], "%Y-%m-%dT%H:%M:%SZ")))
+
+    # Allow for slight variations (±5 seconds)
+    min_time = expected_timestamp - 5
+    max_time = expected_timestamp + 5
+
+    redis_data = test_redis.zrangebyscore(redis_key, min_time, max_time, withscores=True)
+
+    assert len(redis_data) == 1
+    assert float(redis_data[0][0]) == 90.3
+    assert min_time <= int(redis_data[0][1]) <= max_time
 
 
 @pytest.mark.parametrize(
@@ -136,21 +156,18 @@ def test_store_metric_missing_timestamp(test_redis):
     assert response.status_code == 200
     assert response.json() == {"message": "Metric cached"}
 
+    # Generate expected Redis key
+    redis_key = "moniflow:metrics:cpu:host=server-1:usage"
+
     # Retrieve the stored metric from Redis
-    redis_data = test_redis.lrange("moniflow:metrics", 0, -1)
-    assert len(redis_data) == 1
+    current_time = int(time.time())
+    redis_data = test_redis.zrangebyscore(redis_key, current_time - 5, current_time + 5, withscores=True)
 
-    stored_metric = json.loads(redis_data[0])
-    assert "timestamp" in stored_metric  # Ensure timestamp was added
-    assert stored_metric["measurement"] == metric["measurement"]
-    assert stored_metric["tags"] == metric["tags"]
-    assert stored_metric["fields"] == metric["fields"]
+    assert len(redis_data) == 1  # Ensure one metric was stored
+    assert float(redis_data[0][0]) == 90.3  # Value check
 
-    # Ensure timestamp is close to now
-    now = datetime.now(timezone.utc).isoformat()
-    assert (
-        stored_metric["timestamp"][:16] == now[:16]
-    )  # Compare up to minutes to avoid millisecond mismatch
+    stored_timestamp = int(redis_data[0][1])  # Extract stored timestamp
+    assert abs(stored_timestamp - current_time) < 5  # Allow small time drift
 
 
 def test_store_metric_redis_failure():
@@ -171,3 +188,35 @@ def test_store_metric_redis_failure():
 
     assert response.status_code == 503
     assert response.json() == {"detail": "Redis is unavailable. Metric not cached."}
+
+
+# @pytest.mark.parametrize(
+#     "input_timestamp, expected_unix",
+#     [
+#         # Standard ISO format without microseconds or timezone
+#         ("2025-02-28T12:00:00Z", 1745995200),
+#         # ISO format with microseconds and timezone offset
+#         ("2025-02-28T12:00:00.123456+00:00", 1745995200),
+#         # ISO format with different timezone offset
+#         ("2025-02-28T15:00:00.789000+03:00", 1745995200),
+#         # ISO format without timezone but with microseconds
+#         ("2025-02-28T12:00:00.456789", 1745995200),
+#         # Already in Unix timestamp format (int)
+#         (1745995200, 1745995200),
+#     ],
+# )
+# def test_parse_timestamp(input_timestamp, expected_unix):
+#     """Test that parse_timestamp correctly converts various formats to Unix time."""
+#     assert parse_timestamp(input_timestamp) == expected_unix
+
+
+# def test_parse_timestamp_invalid_format():
+#     """Test that parse_timestamp raises ValueError for invalid timestamps."""
+#     with pytest.raises(ValueError, match="Invalid timestamp format"):
+#         parse_timestamp("invalid-timestamp")
+
+#     with pytest.raises(ValueError, match="Invalid timestamp format"):
+#         parse_timestamp("2025/02/28 12:00:00")
+
+#     with pytest.raises(ValueError, match="Invalid timestamp format"):
+#         parse_timestamp(None)

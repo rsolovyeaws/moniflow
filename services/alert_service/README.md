@@ -50,6 +50,23 @@ A metric is sent to the **`/metrics/`** endpoint:
     "timestamp": "2025-02-26T12:00:00Z"
 }
 ```
+---
+
+## Supported Timestamp Formats
+
+The function accepts timestamps in the following formats:
+
+| Format Type                          | Example                        | Description                                      |
+|--------------------------------------|--------------------------------|--------------------------------------------------|
+| Unix Timestamp (int)                 | `1645555200`                   | Already in Unix format, returned as is.        |
+| ISO 8601 with "Z" (UTC time)         | `"2022-02-22T12:00:00Z"`      | Standard ISO format representing UTC time.      |
+| ISO 8601 with microseconds + "Z"     | `"2022-02-22T12:00:00.123456Z"` | Includes fractional seconds (microseconds).    |
+| ISO 8601 with explicit timezone      | `"2022-02-22T14:00:00+02:00"`  | Timezone-aware, properly converted to UTC.     |
+| ISO 8601 with offset (-/+)           | `"2022-02-22T10:00:00-02:00"`  | Adjusts time based on timezone offset.        |
+
+✅ All timestamps are converted to UTC before returning a Unix timestamp (seconds).
+
+
 
 ---
 
@@ -206,3 +223,46 @@ def remove_old_metrics(metric_name, field_name, rule_tags, max_age_seconds):
 | **7️⃣ Cleaning Old Data** | Periodically **removes old metrics** using `ZREMRANGEBYSCORE`. |
 
 ---
+
+# 🌊 Logs vs. Metrics – Their Role in MoniFlow
+
+MoniFlow's Metrics Collector gathers both logs and metrics, but they serve different purposes:
+
+| Data Type | Purpose in MoniFlow | Used by Alert Service? | Used by Dashboard? |
+|-----------|---------------------|------------------------|---------------------|
+| **Metrics** | Performance & health tracking (e.g., CPU, memory, request latency) | ✅ Yes (for threshold-based alerting) | ✅ Yes (for visualization) |
+| **Logs** | Debugging & error tracking (e.g., stack traces, HTTP failures) | ❌ No (not directly used for alerts) | ✅ Yes (for log visualization) |
+
+## 1️⃣ Metrics → Alert Service (Threshold-Based Alerting)
+Metrics are numerical values over time (e.g., `cpu_usage=85%`, `response_time=200ms`).
+
+- Alert Service listens for metric updates and triggers alerts if thresholds are exceeded.
+- Redis is used to track time-based conditions before firing alerts.
+
+### ✅ Examples of Alerts Based on Metrics:
+- "CPU usage > 80% for 5 minutes"
+- "Memory usage < 20% for 10 minutes"
+- "Response time > 500ms for 3 minutes"
+
+## 2️⃣ Logs → Dashboard Service (Observability & Debugging)
+Logs contain text-based messages (e.g., error messages, event descriptions).
+
+- Logs don’t have numerical thresholds, so they are not used for alerts.
+- Instead, logs are forwarded to Dashboard Service, which provides:
+  - **Log search & filtering**
+  - **Log visualization** (e.g., recent errors)
+  - **Tracing for debugging issues**
+
+### ✅ Examples of Logs in Dashboard:
+- `[ERROR] Service X failed due to database timeout.`
+- `[INFO] User X logged in successfully.`
+- `[WARN] High number of failed requests detected.`
+
+## 🚀 Summary of Responsibilities
+
+| Service | Responsibilities |
+|---------|-----------------|
+| **Metrics Collector** | Collects both metrics and logs, then forwards them to the appropriate services. |
+| **Alert Service** | Uses metrics to trigger alerts (based on thresholds & duration). |
+| **Dashboard Service** | Displays both logs and metrics for monitoring & debugging (but doesn’t generate alerts). |
+
