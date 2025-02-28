@@ -6,10 +6,12 @@ import redis
 from main import app
 from dotenv import load_dotenv
 
-load_dotenv(".env.test")
+load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://admin:password@mongo:27017/moniflow_test")
 TEST_DB_NAME = "moniflow_test"
+
+os.environ["PYTEST_RUNNING"] = "true"
 
 
 @pytest.fixture(scope="session")
@@ -44,6 +46,8 @@ def test_client():
 @pytest.fixture(scope="function")
 def test_redis():
     """Fixture to connect to test Redis and clear it before each test."""
+    load_dotenv(".env.test")
+
     redis_client = redis.Redis(
         host=os.getenv("TEST_REDIS_HOST", "localhost"),
         port=int(os.getenv("TEST_REDIS_PORT", 6380)),

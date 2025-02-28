@@ -18,6 +18,10 @@ services:
     restart: always
     ports:
       - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=password
+      - ALLOW_EMPTY_PASSWORD=no
+    command: redis-server --requirepass password
     volumes:
       - redis_data:/data
 
@@ -48,7 +52,6 @@ services:
       - ./services/alert_service:/app
     env_file:
       - ./services/alert_service/.env
-      - ./services/alert_service/.env.test 
     depends_on:
       - redis
       - mongo

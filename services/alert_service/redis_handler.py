@@ -2,6 +2,7 @@ import os
 import redis
 import json
 import logging
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -12,7 +13,9 @@ logger = logging.getLogger(__name__)
 # REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 REDIS_ALERT_EXPIRY = int(os.getenv("REDIS_ALERT_EXPIRY", "300"))
 
-if os.getenv("TEST_REDIS_HOST"):
+if os.getenv("PYTEST_RUNNING") == "true":
+    logger.info("Running tests, using test Redis configuration")
+    load_dotenv(".env.test")
     REDIS_HOST = os.getenv("TEST_REDIS_HOST", "moniflow-test-redis")
     REDIS_PORT = int(os.getenv("TEST_REDIS_PORT", 6379))
     REDIS_DB = int(os.getenv("TEST_REDIS_DB", 1))
@@ -44,6 +47,7 @@ def store_metric_in_cache(metric_data: dict):
     """
     try:
         redis_client.rpush("moniflow:metrics", json.dumps(metric_data))
+        logger.info(f"Stored metric in Redis: {metric_data}")
     except redis.RedisError as e:
         logger.error(f"Redis Error: {e}")
         raise
