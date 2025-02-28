@@ -1,10 +1,12 @@
-from celery import shared_task
 import logging
 import redis
 import json
 import os
-from database import get_alert_rules, log_alert
-from redis_handler import set_alert_state, get_alert_state, set_recovery_state, get_recovery_state
+
+from celery import shared_task
+from celery.schedules import crontab
+
+from celery_worker import celery
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,8 +19,15 @@ redis_client = redis.Redis(
     decode_responses=True,
 )
 
+celery.conf.beat_schedule = {
+    "process_metrics_every_thirty_seconds": {
+        "task": "alert_service.process_metrics",
+        "schedule": 30.0,  # seconds
+    },
+}
 
-@shared_task(name="alert_service.process_metrics")
+
+@celery.task(name="alert_service.process_metrics")
 def process_metrics():
     """
     Celery task that pulls metrics from Redis and processes them.

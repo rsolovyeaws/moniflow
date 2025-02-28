@@ -8,4 +8,4 @@ pymongo
 python-dotenv
 email-validator
 pytest
-celery[redis]
+celery[redis]>=5.2.0

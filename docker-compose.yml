@@ -71,6 +71,20 @@ services:
     depends_on:
       - redis
       - alert_service
+  
+  celery_beat:
+      build: ./services/alert_service
+      container_name: moniflow-celery-beat
+      command: celery -A celery_worker beat --loglevel=info
+      environment:
+        - PYTHONPATH=/app
+      env_file:
+        - ./services/alert_service/.env
+      working_dir: /app
+      volumes:
+        - ./services/alert_service:/app
+      depends_on:
+        - alert_worker
 
   dashboard_service:
     build: ./services/dashboard_service
