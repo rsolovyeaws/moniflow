@@ -1,4 +1,5 @@
 import os
+import logging
 from bson import ObjectId, errors
 from pymongo import MongoClient
 from datetime import datetime
@@ -8,6 +9,9 @@ from notifiers.email_notifier import EmailNotifier
 from notifiers.telegram_notifier import TelegramNotifier
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 MONGO_URI = os.getenv("MONGO_URI")
 TEST_DB_NAME = "moniflow_test"
@@ -157,9 +161,7 @@ def send_notifications(rule, metric_value):
     notified_channels = []
 
     if "email" in rule["notification_channels"]:
-        email_notifier = EmailNotifier(
-            "smtp.example.com", 587, "alert@example.com", "password"
-        )
+        email_notifier = EmailNotifier("smtp.example.com", 587, "alert@example.com", "password")
         email_notifier.send_alert(message, rule["recipients"].get("email", []))
         notified_channels.append("email")
 
