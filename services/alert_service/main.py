@@ -7,10 +7,14 @@ from database import (
     get_alert_rules,
 )
 from notifiers.telegram_notifier import TelegramNotifier
-from redis_handler import store_metric_in_cache
+
+# from redis_handler import store_metric_in_cache  # REPLACE WITH RedisMetrics class
 from models import AlertRuleCreate, Metric
+from redis_config import redis_client
+from dao.redis.metrics import RedisMetrics
 
 app = FastAPI()
+redis_metrics = RedisMetrics(redis_client)
 
 
 @app.get("/")
@@ -90,7 +94,7 @@ async def cache_metric(metric: Metric):
     metric_dict = metric.model_dump()
 
     try:
-        store_metric_in_cache(metric_dict)
+        redis_metrics.store_metric_in_cache(metric_dict)
     except redis.RedisError:
         raise HTTPException(status_code=503, detail="Redis is unavailable. Metric not cached.")
 

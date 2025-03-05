@@ -277,3 +277,16 @@ Logs contain text-based messages (e.g., error messages, event descriptions).
 |-----------------|-------------------------------------|--------------|------------|----------------------------------------------|
 | Active Alert    | `moniflow:alert_state:{rule_id}`    | "triggered"  | 5 minutes  | Prevents duplicate alerts                    |
 | Recovery Alert  | `moniflow:recovery_state:{rule_id}` | "recovered"  | 10 minutes | Ensures recovery alerts are only sent once   |
+
+
+📖 Strict Timestamp Rules
+| Timestamp Format               | Valid? | Reason                                    |
+|--------------------------------|--------|-------------------------------------------|
+| "2025-02-26T12:00:00Z"         | ✅ YES | UTC timezone explicitly provided          |
+| "2025-02-26T14:00:00+02:00"    | ✅ YES | Explicit timezone, converted to UTC       |
+| "2025-02-26T10:00:00-02:00"    | ✅ YES | Explicit timezone, converted to UTC       |
+| "2025-02-26T12:00:00.123456Z"  | ✅ YES | Microseconds supported                    |
+| "2025-02-26T12:00:00"          | ❌ NO  | Missing timezone (Ambiguous)              |
+| "2025-02-26"                   | ❌ NO  | Date only, no time provided               |
+| "not-a-timestamp"              | ❌ NO  | Completely invalid format                 |
+| 1645531200                     | ❌ NO  | Unix timestamp not accepted (must be ISO 8601) |

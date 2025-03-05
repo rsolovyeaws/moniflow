@@ -1,25 +1,19 @@
 import logging
-import redis
 import json
-import os
+
+from pydantic import ValidationError
 
 from celery_worker import celery
 from database import alert_rules
-from redis_key_schema import KeySchema
-from pydantic import ValidationError
+from dao.redis.key_schema import KeySchema
 from models import AlertRuleSchema
-from redis_metrics import RedisMetrics
+from dao.redis.metrics import RedisMetrics
+from redis_config import redis_client
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-redis_client = redis.Redis(
-    host=os.getenv("REDIS_HOST", "redis"),
-    port=int(os.getenv("REDIS_PORT", 6379)),
-    db=int(os.getenv("REDIS_DB", 0)),
-    password=os.getenv("REDIS_PASSWORD", None),
-    decode_responses=True,
-)
+redis_metrics = RedisMetrics(redis_client)
 
 celery.conf.beat_schedule = {
     "process_metrics_every_thirty_seconds": {
@@ -39,7 +33,7 @@ def process_metrics():
     Celery task that pulls metrics from Redis and processes them.
     """
     while True:
-        metric_data = redis_client.lpop("moniflow:metrics")
+        metric_data = redis_metrics.lpop("moniflow:metrics")
 
         if metric_data is None:
             break
@@ -55,7 +49,6 @@ def fetch_alert_rules():
     and generates Redis keys for processing.
     """
     alert_rules_data = list(alert_rules.find({}))
-    redis_metrics = RedisMetrics(redis_client)
 
     valid_keys = []
     for rule in alert_rules_data:

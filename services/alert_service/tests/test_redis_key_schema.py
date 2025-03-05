@@ -1,5 +1,5 @@
 import pytest
-from redis_key_schema import KeySchema
+from dao.redis.key_schema import KeySchema
 
 
 @pytest.mark.parametrize(

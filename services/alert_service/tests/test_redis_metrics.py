@@ -1,7 +1,7 @@
 import pytest
 import redis
 from unittest.mock import MagicMock
-from redis_metrics import RedisMetrics
+from dao.redis.metrics import RedisMetrics
 
 
 @pytest.fixture
