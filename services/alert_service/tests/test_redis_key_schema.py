@@ -37,3 +37,39 @@ from redis_key_schema import KeySchema
 def test_build_redis_metric_key(metric_name, tags, field_name, expected_key):
     """Test Redis key generation for valid inputs."""
     assert KeySchema.build_redis_metric_key(metric_name, tags, field_name) == expected_key
+
+
+@pytest.mark.parametrize(
+    "rule_id, expected_key",
+    [
+        # Basic rule ID
+        ("rule123", "moniflow:alert_state:rule123"),
+        # Rule ID with special characters
+        ("alert/cpu-high#2", "moniflow:alert_state:alert/cpu-high#2"),
+        # Long rule ID
+        ("a" * 100, f"moniflow:alert_state:{'a' * 100}"),
+        # Empty rule ID
+        ("", "moniflow:alert_state:"),
+    ],
+)
+def test_build_alert_state_key(rule_id, expected_key):
+    """Test alert state key generation for various rule IDs."""
+    assert KeySchema.build_alert_state_key(rule_id) == expected_key
+
+
+@pytest.mark.parametrize(
+    "rule_id, expected_key",
+    [
+        # Basic rule ID
+        ("rule123", "moniflow:recovery_state:rule123"),
+        # Rule ID with special characters
+        ("recovery/mem-low#2", "moniflow:recovery_state:recovery/mem-low#2"),
+        # Long rule ID
+        ("b" * 100, f"moniflow:recovery_state:{'b' * 100}"),
+        # Empty rule ID
+        ("", "moniflow:recovery_state:"),
+    ],
+)
+def test_build_recovery_state_key(rule_id, expected_key):
+    """Test recovery state key generation for various rule IDs."""
+    assert KeySchema.build_recovery_state_key(rule_id) == expected_key

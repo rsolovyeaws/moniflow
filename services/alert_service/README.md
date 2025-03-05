@@ -110,7 +110,10 @@ A user may have **multiple alert rules**:
     "notification_channels": ["telegram"],
     "recipients": {
         "telegram": ["@admin"]
-    }
+    },
+    "use_recovery_alert": true,
+    "recovery_time_value": 10,
+    "recovery_time_unit": "seconds"
 }
 ```
 
@@ -266,3 +269,11 @@ Logs contain text-based messages (e.g., error messages, event descriptions).
 | **Alert Service** | Uses metrics to trigger alerts (based on thresholds & duration). |
 | **Dashboard Service** | Displays both logs and metrics for monitoring & debugging (but doesn’t generate alerts). |
 
+
+
+
+
+| State           | Key Format                          | Value        | Expires    | Purpose                                      |
+|-----------------|-------------------------------------|--------------|------------|----------------------------------------------|
+| Active Alert    | `moniflow:alert_state:{rule_id}`    | "triggered"  | 5 minutes  | Prevents duplicate alerts                    |
+| Recovery Alert  | `moniflow:recovery_state:{rule_id}` | "recovered"  | 10 minutes | Ensures recovery alerts are only sent once   |
