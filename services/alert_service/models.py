@@ -15,7 +15,7 @@ class AlertRuleSchema(BaseModel):
     threshold: float
     duration_value: int = Field(..., gt=0)
     duration_unit: Literal["seconds", "minutes", "hours"]
-    comparison: Literal[">", "<", "=="]
+    comparison: Literal[">", "<", "==", ">=", "<=", "!="]
     notification_channels: List[str]
     recipients: Dict[str, List[str]]
     use_recovery_alert: bool
@@ -35,7 +35,7 @@ class AlertRuleCreate(BaseModel):
     threshold: float
     duration_value: int = Field(..., gt=0)  # Must be positive
     duration_unit: Literal["seconds", "minutes", "hours"] = "seconds"  # Default to seconds
-    comparison: Literal[">", "<", "=="]
+    comparison: Literal[">", "<", "==", ">=", "<=", "!="]  # Comparison operator
     notification_channels: List[str] = ["telegram"]  # Default to Telegram
     recipients: Dict[str, List[str]] = {}  # Default to empty
     use_recovery_alert: bool = False  # Default disabled
