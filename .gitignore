@@ -25,3 +25,6 @@ docker-compose.override.yml
 
 services/alert_service/celerybeat-schedule
 .vscode
+
+celerybeat-schedule
+.env

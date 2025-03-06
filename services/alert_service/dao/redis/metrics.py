@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from dateutil import parser
 
 from dao.redis.base import RedisDaoBase
+from validators.metric_query_validator import MetricQueryValidator
 
 logger = logging.getLogger(__name__)
 
@@ -104,30 +105,23 @@ class RedisMetrics(RedisDaoBase):
             logger.error(f"Redis Error: {e}")
             raise
 
-    def get_metric_values(self, redis_key: str, duration_value: int, duration_unit: str):
+    def get_metric_values(self, metric_name: str, tags: dict, field_name: str, duration_value: int, duration_unit: str):
         """
-        Fetch metric values from Redis using a precomputed key.
-
-        Steps:
-        1. Validate inputs.
-        2. Calculate the time range based on `duration_value` & `duration_unit`.
-        3. Query Redis using the provided key for values in that range.
+        Fetch metric values from Redis based on metric details.
 
         Args:
-            redis_key (str): The **precomputed Redis key** from Celery task.
-            duration_value (int): The duration value for querying historical data.
-            duration_unit (str): The duration unit ('seconds', 'minutes', 'hours').
+            metric_name (str): Name of the metric.
+            tags (dict): Tags associated with the metric.
+            field_name (str): Specific field within the metric.
+            duration_value (int): Duration to look back.
+            duration_unit (str): Unit of duration (seconds, minutes, hours).
 
         Returns:
-            List[float]: A list of metric values for the given time range.
+            List[float]: A list of metric values within the specified time range.
         """
-        # Validate inputs
-        if not isinstance(redis_key, str) or not redis_key.strip():
-            raise ValueError("Invalid redis_key: must be a non-empty string.")
-        if not isinstance(duration_value, int) or duration_value <= 0:
-            raise ValueError("Invalid duration_value: must be a positive integer.")
-        if duration_unit not in {"seconds", "minutes", "hours"}:
-            raise ValueError("Invalid duration_unit: must be 'seconds', 'minutes', or 'hours'.")
+        MetricQueryValidator.validate(metric_name, tags, field_name, duration_value, duration_unit)
+
+        redis_key = self.key_schema.build_redis_metric_key(metric_name, tags, field_name)
 
         # Calculate the time range
         current_time = int(time.time())
@@ -135,7 +129,7 @@ class RedisMetrics(RedisDaoBase):
         min_time = current_time - duration_seconds
 
         try:
-            # Query Redis for values within the time range
+            # Query Redis
             values = self.redis_client.zrangebyscore(redis_key, min_time, current_time)
             return [float(v) for v in values] if values else []
 

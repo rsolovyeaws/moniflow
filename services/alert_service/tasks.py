@@ -62,8 +62,15 @@ def fetch_alert_rules():
             )
 
             # Query Redis for the last `duration_value`
+            # metric_values = redis_metrics.get_metric_values(
+            #     redis_key, validated_rule.duration_value, validated_rule.duration_unit
+            # )
             metric_values = redis_metrics.get_metric_values(
-                redis_key, validated_rule.duration_value, validated_rule.duration_unit
+                validated_rule.metric_name,
+                validated_rule.tags,
+                validated_rule.field_name,
+                validated_rule.duration_value,
+                validated_rule.duration_unit,
             )
 
             logger.info(f"Fetched {len(metric_values)} values for {redis_key}: {metric_values}")

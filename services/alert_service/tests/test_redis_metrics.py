@@ -2,6 +2,7 @@ import pytest
 import redis
 from unittest.mock import MagicMock
 from dao.redis.metrics import RedisMetrics
+from dao.redis.key_schema import KeySchema  # Assuming KeySchema is in key_schema.py
 
 
 @pytest.fixture
@@ -11,9 +12,15 @@ def mock_redis():
 
 
 @pytest.fixture
-def redis_metrics(mock_redis):
-    """Fixture to create a RedisMetrics instance with a mock Redis client."""
-    return RedisMetrics(mock_redis)
+def mock_key_schema():
+    """Fixture to mock KeySchema."""
+    return MagicMock(spec=KeySchema)
+
+
+@pytest.fixture
+def redis_metrics(mock_redis, mock_key_schema):
+    """Fixture to create a RedisMetrics instance with mocked dependencies."""
+    return RedisMetrics(mock_redis, mock_key_schema)
 
 
 # Test Initialization
@@ -53,44 +60,81 @@ def test_convert_duration_to_seconds_invalid_unit():
 
 
 @pytest.mark.parametrize(
-    "redis_key, duration_value, duration_unit",
+    "metric_name, tags, field_name, duration_value, duration_unit",
     [
-        ("moniflow:metrics:cpu_usage:host=server-1:usage", 5, "minutes"),
-        ("moniflow:metrics:memory_usage:region=us-east:consumption", 10, "seconds"),
+        ("cpu_usage", {"host": "server-1"}, "usage", 5, "minutes"),
+        ("memory_usage", {"region": "us-east"}, "consumption", 10, "seconds"),
     ],
 )
-def test_get_metric_values_valid_inputs(redis_metrics, redis_key, duration_value, duration_unit):
+def test_get_metric_values_valid_inputs(redis_metrics, metric_name, tags, field_name, duration_value, duration_unit):
     """Test that valid inputs query Redis properly."""
+    mock_redis_key = f"moniflow:metrics:{metric_name}:{tags}:{field_name}"
+
+    # Mock Redis response
     redis_metrics.redis_client.zrangebyscore.return_value = ["10.5", "20.1", "30.7"]
 
-    values = redis_metrics.get_metric_values(redis_key, duration_value, duration_unit)
+    # Mock key generation
+    redis_metrics.key_schema.build_redis_metric_key.return_value = mock_redis_key
+
+    values = redis_metrics.get_metric_values(metric_name, tags, field_name, duration_value, duration_unit)
 
     assert isinstance(values, list)
     assert values == [10.5, 20.1, 30.7]
+
+    # Ensure the key generation method was called correctly
+    redis_metrics.key_schema.build_redis_metric_key.assert_called_once_with(metric_name, tags, field_name)
+
+    # Ensure Redis query was made using the generated key
     redis_metrics.redis_client.zrangebyscore.assert_called_once()
 
 
 @pytest.mark.parametrize(
-    "redis_key, duration_value, duration_unit, expected_error",
+    "metric_name, tags, field_name, duration_value, duration_unit, expected_error",
     [
-        (None, 5, "minutes", "Invalid redis_key: must be a non-empty string."),
-        ("", 5, "minutes", "Invalid redis_key: must be a non-empty string."),
-        ("valid_key", -1, "minutes", "Invalid duration_value: must be a positive integer."),
-        ("valid_key", "five", "minutes", "Invalid duration_value: must be a positive integer."),
-        ("valid_key", 5, "invalid_unit", "Invalid duration_unit: must be 'seconds', 'minutes', or 'hours'."),
+        (None, {"host": "server-1"}, "usage", 5, "minutes", "Invalid metric_name: must be a non-empty string."),
+        ("", {"host": "server-1"}, "usage", 5, "minutes", "Invalid metric_name: must be a non-empty string."),
+        ("valid_metric", None, "usage", 5, "minutes", "Invalid tags: must be a non-empty dictionary."),
+        ("valid_metric", {}, "usage", 5, "minutes", "Invalid tags: must be a non-empty dictionary."),
+        ("valid_metric", {"host": "server-1"}, None, 5, "minutes", "Invalid field_name: must be a non-empty string."),
+        (
+            "valid_metric",
+            {"host": "server-1"},
+            "usage",
+            -1,
+            "minutes",
+            "Invalid duration_value: must be a positive integer.",
+        ),
+        (
+            "valid_metric",
+            {"host": "server-1"},
+            "usage",
+            5,
+            "invalid_unit",
+            "Invalid duration_unit: must be one of 'seconds', 'minutes', or 'hours'.",
+        ),
     ],
 )
-def test_get_metric_values_invalid_inputs(redis_metrics, redis_key, duration_value, duration_unit, expected_error):
+def test_get_metric_values_invalid_inputs(
+    redis_metrics, metric_name, tags, field_name, duration_value, duration_unit, expected_error
+):
     """Ensure that invalid inputs raise ValueErrors."""
     with pytest.raises(ValueError, match=expected_error):
-        redis_metrics.get_metric_values(redis_key, duration_value, duration_unit)
+        redis_metrics.get_metric_values(metric_name, tags, field_name, duration_value, duration_unit)
 
 
 def test_get_metric_values_redis_error(redis_metrics):
     """Ensure Redis errors are handled gracefully and return an empty list."""
+    mock_redis_key = "moniflow:metrics:cpu_usage:host=server-1:usage"
+
+    # Mock key generation
+    redis_metrics.key_schema.build_redis_metric_key.return_value = mock_redis_key
+
+    # Simulate Redis failure
     redis_metrics.redis_client.zrangebyscore.side_effect = redis.RedisError("Redis failure")
 
-    values = redis_metrics.get_metric_values("valid_key", 5, "minutes")
+    values = redis_metrics.get_metric_values("cpu_usage", {"host": "server-1"}, "usage", 5, "minutes")
 
     assert values == []
+
+    # Ensure Redis query was attempted
     redis_metrics.redis_client.zrangebyscore.assert_called_once()
