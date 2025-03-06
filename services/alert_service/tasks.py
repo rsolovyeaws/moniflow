@@ -5,10 +5,10 @@ from pydantic import ValidationError
 
 from celery_worker import celery
 from database import alert_rules
-from dao.redis.key_schema import KeySchema
 from models import AlertRuleSchema
 from dao.redis.metrics import RedisMetrics
 from redis_config import redis_client
+from evaluators.alert_evaluator import AlertEvaluator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,26 +45,17 @@ def process_metrics():
 @celery.task(name="alert_service.fetch_alert_rules")
 def fetch_alert_rules():
     """
-    Celery task that fetches alert rules from the database, validates them,
-    and generates Redis keys for processing.
+    Celery task that fetches alert rules from the database, validates them, and fetches metric values...
+    WIP:
     """
     alert_rules_data = list(alert_rules.find({}))
 
-    valid_keys = []
+    valid_rules = []
     for rule in alert_rules_data:
         try:
             # Validate alert rule using Pydantic
             validated_rule = AlertRuleSchema(**rule)
 
-            # Generate Redis key using validated rule
-            redis_key = KeySchema.build_redis_metric_key(
-                validated_rule.metric_name, validated_rule.tags, validated_rule.field_name
-            )
-
-            # Query Redis for the last `duration_value`
-            # metric_values = redis_metrics.get_metric_values(
-            #     redis_key, validated_rule.duration_value, validated_rule.duration_unit
-            # )
             metric_values = redis_metrics.get_metric_values(
                 validated_rule.metric_name,
                 validated_rule.tags,
@@ -73,11 +64,15 @@ def fetch_alert_rules():
                 validated_rule.duration_unit,
             )
 
-            logger.info(f"Fetched {len(metric_values)} values for {redis_key}: {metric_values}")
+            logger.info(f"Fetched {len(metric_values)} values for {validated_rule}.")
 
-            valid_keys.append(redis_key)
+            valid_rules.append(validated_rule)
+
+            if AlertEvaluator.from_alert_rule(validated_rule, metric_values):
+                logger.warning(f"Alert triggered for {validated_rule.metric_name}!")
+                # TODO: Send notification (next step)
 
         except ValidationError as e:
             logger.error(f"Skipping invalid alert rule: {e.errors()}")
 
-    logger.info(f"Processed {len(valid_keys)} valid alert rules and generated Redis keys: {valid_keys}")
+    logger.info(f"Processed {len(valid_rules)} valid alert rules out of {len(alert_rules_data)}.")
