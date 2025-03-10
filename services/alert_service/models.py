@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 from datetime import datetime, timezone
 
 
@@ -9,18 +9,17 @@ class AlertRuleSchema(BaseModel):
     Used internally when fetching from MongoDB.
     """
 
+    rule_id: Optional[str] = None
     metric_name: str = Field(..., min_length=1)
     tags: Dict[str, str] = Field(..., min_length=1)
     field_name: str = Field(..., min_length=1)
     threshold: float
-    duration_value: int = Field(..., gt=0)
-    duration_unit: Literal["seconds", "minutes", "hours"]
+    duration: int = Field(..., gt=0)
     comparison: Literal[">", "<", "==", ">=", "<=", "!="]
     notification_channels: List[str]
     recipients: Dict[str, List[str]]
     use_recovery_alert: bool
-    recovery_time_value: int | None = Field(None, ge=0)
-    recovery_time_unit: Literal["seconds", "minutes", "hours"] | None
+    recovery_time: int | None = Field(None, ge=0)
 
 
 class AlertRuleCreate(BaseModel):

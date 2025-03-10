@@ -105,7 +105,7 @@ class RedisMetrics(RedisDaoBase):
             logger.error(f"Redis Error: {e}")
             raise
 
-    def get_metric_values(self, metric_name: str, tags: dict, field_name: str, duration_value: int, duration_unit: str):
+    def get_metric_values(self, metric_name: str, tags: dict, field_name: str, duration: int):
         """
         Fetch metric values from Redis based on metric details.
 
@@ -119,14 +119,13 @@ class RedisMetrics(RedisDaoBase):
         Returns:
             List[float]: A list of metric values within the specified time range.
         """
-        MetricQueryValidator.validate(metric_name, tags, field_name, duration_value, duration_unit)
+        MetricQueryValidator.validate(metric_name, tags, field_name, duration)
 
         redis_key = self.key_schema.build_redis_metric_key(metric_name, tags, field_name)
 
         # Calculate the time range
         current_time = int(time.time())
-        duration_seconds = self._convert_duration_to_seconds(duration_value, duration_unit)
-        min_time = current_time - duration_seconds
+        min_time = current_time - duration
 
         try:
             # Query Redis

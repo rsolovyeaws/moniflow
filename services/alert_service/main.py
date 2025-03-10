@@ -1,20 +1,17 @@
-from fastapi import FastAPI, HTTPException
 import redis
-from database import (
-    create_alert_rule,
-    delete_alert_rule,
-    get_alert_rule_by_id,
-    get_alert_rules,
-)
-from notifiers.telegram_notifier import TelegramNotifier
 
-# from redis_handler import store_metric_in_cache  # REPLACE WITH RedisMetrics class
+from fastapi import FastAPI, HTTPException
+
 from models import AlertRuleCreate, Metric
 from redis_config import redis_client
+from mongo_config import mongo_client, MONGO_DB_NAME
 from dao.redis.metrics import RedisMetrics
+from dao.mongo.mongo_alert_rules import MongoAlertRule
+from notifiers.telegram_notifier import TelegramNotifier
 
 app = FastAPI()
 redis_metrics = RedisMetrics(redis_client)
+mongo_alert_rules_client = MongoAlertRule(mongo_client, MONGO_DB_NAME)
 
 
 @app.get("/")
@@ -39,7 +36,7 @@ def create_alert(rule: AlertRuleCreate):
         rule_dict["recovery_time_value"] = None
         rule_dict["recovery_time_unit"] = None
 
-    rule_id = create_alert_rule(**rule_dict)
+    rule_id = mongo_alert_rules_client.create_alert_rule(**rule_dict)
     return {"message": "Alert rule created", "rule_id": str(rule_id)}
 
 
@@ -55,7 +52,7 @@ def get_alert(rule_id: str):
         HTTPException: If the alert rule is not found, raises a 404 HTTP exception.
     """
 
-    rule = get_alert_rule_by_id(rule_id)
+    rule = mongo_alert_rules_client.get_alert_rule_by_id(rule_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Alert rule not found")
     return rule
@@ -64,7 +61,7 @@ def get_alert(rule_id: str):
 @app.get("/alerts/")
 def get_alerts():
     """Retrieve all alert rules from the database."""
-    return {"alert_rules": get_alert_rules()}
+    return {"alert_rules": mongo_alert_rules_client.get_alert_rules()}
 
 
 @app.delete("/alerts/{rule_id}")
@@ -79,7 +76,7 @@ def delete_alert(rule_id: str):
         HTTPException: If the alert rule is not found, raises a 404 HTTP exception.
     """
 
-    result = delete_alert_rule(rule_id)
+    result = mongo_alert_rules_client.delete_alert_rule(rule_id)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Alert rule not found")
     return {"message": "Alert rule deleted"}

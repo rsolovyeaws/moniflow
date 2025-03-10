@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://admin:password@mongo:27017/moniflow_test")
-TEST_DB_NAME = "moniflow_test"
+MONGO_URI = os.getenv("TEST_MONGO_URI", "")
+TEST_DB_NAME = os.getenv("TEST_MONGO_DB_NAME", "")
 
 os.environ["PYTEST_RUNNING"] = "true"
 

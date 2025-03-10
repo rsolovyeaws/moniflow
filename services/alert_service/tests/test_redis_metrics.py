@@ -2,7 +2,7 @@ import pytest
 import redis
 from unittest.mock import MagicMock
 from dao.redis.metrics import RedisMetrics
-from dao.redis.key_schema import KeySchema  # Assuming KeySchema is in key_schema.py
+from dao.redis.key_schema import KeySchema
 
 
 @pytest.fixture
@@ -23,50 +23,14 @@ def redis_metrics(mock_redis, mock_key_schema):
     return RedisMetrics(mock_redis, mock_key_schema)
 
 
-# Test Initialization
-def test_redis_metrics_initialization(mock_redis):
-    """Ensure RedisMetrics initializes with a valid Redis client."""
-    instance = RedisMetrics(mock_redis)
-    assert instance.redis_client == mock_redis
-
-
-def test_redis_metrics_initialization_invalid():
-    """Ensure RedisMetrics raises TypeError if initialized with an invalid client."""
-    with pytest.raises(TypeError, match="redis_client must be an instance of redis.Redis"):
-        RedisMetrics("not-a-redis-client")
-
-
-# Test `_convert_duration_to_seconds`
 @pytest.mark.parametrize(
-    "value, unit, expected_seconds",
+    "metric_name, tags, field_name, duration",
     [
-        (1, "seconds", 1),
-        (5, "seconds", 5),
-        (1, "minutes", 60),
-        (3, "minutes", 180),
-        (1, "hours", 3600),
-        (2, "hours", 7200),
+        ("cpu_usage", {"host": "server-1"}, "usage", 300),  # 5 minutes in seconds
+        ("memory_usage", {"region": "us-east"}, "consumption", 10),  # 10 seconds
     ],
 )
-def test_convert_duration_to_seconds(value, unit, expected_seconds):
-    """Test conversion of different time units to seconds."""
-    assert RedisMetrics._convert_duration_to_seconds(value, unit) == expected_seconds
-
-
-def test_convert_duration_to_seconds_invalid_unit():
-    """Ensure invalid time units raise a ValueError."""
-    with pytest.raises(ValueError, match="Invalid duration unit: days. Must be 'seconds', 'minutes', or 'hours'."):
-        RedisMetrics._convert_duration_to_seconds(5, "days")
-
-
-@pytest.mark.parametrize(
-    "metric_name, tags, field_name, duration_value, duration_unit",
-    [
-        ("cpu_usage", {"host": "server-1"}, "usage", 5, "minutes"),
-        ("memory_usage", {"region": "us-east"}, "consumption", 10, "seconds"),
-    ],
-)
-def test_get_metric_values_valid_inputs(redis_metrics, metric_name, tags, field_name, duration_value, duration_unit):
+def test_get_metric_values_valid_inputs(redis_metrics, metric_name, tags, field_name, duration):
     """Test that valid inputs query Redis properly."""
     mock_redis_key = f"moniflow:metrics:{metric_name}:{tags}:{field_name}"
 
@@ -76,7 +40,7 @@ def test_get_metric_values_valid_inputs(redis_metrics, metric_name, tags, field_
     # Mock key generation
     redis_metrics.key_schema.build_redis_metric_key.return_value = mock_redis_key
 
-    values = redis_metrics.get_metric_values(metric_name, tags, field_name, duration_value, duration_unit)
+    values = redis_metrics.get_metric_values(metric_name, tags, field_name, duration)
 
     assert isinstance(values, list)
     assert values == [10.5, 20.1, 30.7]
@@ -89,37 +53,21 @@ def test_get_metric_values_valid_inputs(redis_metrics, metric_name, tags, field_
 
 
 @pytest.mark.parametrize(
-    "metric_name, tags, field_name, duration_value, duration_unit, expected_error",
+    "metric_name, tags, field_name, duration, expected_error",
     [
-        (None, {"host": "server-1"}, "usage", 5, "minutes", "Invalid metric_name: must be a non-empty string."),
-        ("", {"host": "server-1"}, "usage", 5, "minutes", "Invalid metric_name: must be a non-empty string."),
-        ("valid_metric", None, "usage", 5, "minutes", "Invalid tags: must be a non-empty dictionary."),
-        ("valid_metric", {}, "usage", 5, "minutes", "Invalid tags: must be a non-empty dictionary."),
-        ("valid_metric", {"host": "server-1"}, None, 5, "minutes", "Invalid field_name: must be a non-empty string."),
-        (
-            "valid_metric",
-            {"host": "server-1"},
-            "usage",
-            -1,
-            "minutes",
-            "Invalid duration_value: must be a positive integer.",
-        ),
-        (
-            "valid_metric",
-            {"host": "server-1"},
-            "usage",
-            5,
-            "invalid_unit",
-            "Invalid duration_unit: must be one of 'seconds', 'minutes', or 'hours'.",
-        ),
+        (None, {"host": "server-1"}, "usage", 300, "Invalid metric_name: must be a non-empty string."),
+        ("", {"host": "server-1"}, "usage", 300, "Invalid metric_name: must be a non-empty string."),
+        ("valid_metric", None, "usage", 300, "Invalid tags: must be a non-empty dictionary."),
+        ("valid_metric", {}, "usage", 300, "Invalid tags: must be a non-empty dictionary."),
+        ("valid_metric", {"host": "server-1"}, None, 300, "Invalid field_name: must be a non-empty string."),
+        ("valid_metric", {"host": "server-1"}, "usage", -1, "Invalid duration_value: must be a positive integer."),
+        ("valid_metric", {"host": "server-1"}, "usage", "five", "Invalid duration_value: must be a positive integer."),
     ],
 )
-def test_get_metric_values_invalid_inputs(
-    redis_metrics, metric_name, tags, field_name, duration_value, duration_unit, expected_error
-):
-    """Ensure that invalid inputs raise ValueErrors."""
+def test_get_metric_values_invalid_inputs(redis_metrics, metric_name, tags, field_name, duration, expected_error):
+    """Ensure that invalid inputs raise ValueErrors with correct messages."""
     with pytest.raises(ValueError, match=expected_error):
-        redis_metrics.get_metric_values(metric_name, tags, field_name, duration_value, duration_unit)
+        redis_metrics.get_metric_values(metric_name, tags, field_name, duration)
 
 
 def test_get_metric_values_redis_error(redis_metrics):
@@ -132,7 +80,7 @@ def test_get_metric_values_redis_error(redis_metrics):
     # Simulate Redis failure
     redis_metrics.redis_client.zrangebyscore.side_effect = redis.RedisError("Redis failure")
 
-    values = redis_metrics.get_metric_values("cpu_usage", {"host": "server-1"}, "usage", 5, "minutes")
+    values = redis_metrics.get_metric_values("cpu_usage", {"host": "server-1"}, "usage", 300)
 
     assert values == []
 

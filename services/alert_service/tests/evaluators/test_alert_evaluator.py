@@ -62,12 +62,10 @@ def test_evaluate_alert_from_alert_rule():
         tags={"host": "server-1"},
         field_name="usage",
         threshold=85.0,
-        duration_value=5,
-        duration_unit="minutes",
+        duration=300,  # ✅ 5 minutes in seconds
         comparison=">",
         use_recovery_alert=True,
-        recovery_time_value=10,
-        recovery_time_unit="minutes",
+        recovery_time=600,  # ✅ 10 minutes in seconds
         notification_channels=["telegram"],
         recipients={"telegram": ["@user1"]},
     )
@@ -86,12 +84,10 @@ def test_evaluate_alert_from_alert_rule_invalid():
         tags={"host": "server-1"},
         field_name="usage",
         threshold=85.0,
-        duration_value=5,
-        duration_unit="minutes",
+        duration=300,  # ✅ 5 minutes in seconds
         comparison=">",
         use_recovery_alert=True,
-        recovery_time_value=10,
-        recovery_time_unit="minutes",
+        recovery_time=600,  # ✅ 10 minutes in seconds
         notification_channels=["telegram"],
         recipients={"telegram": ["@user1"]},
     )
