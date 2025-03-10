@@ -1,3 +1,4 @@
+from typing import List, Union
 import redis
 
 from fastapi import FastAPI, HTTPException
@@ -83,19 +84,23 @@ def delete_alert(rule_id: str):
 
 
 @app.post("/metrics/")
-async def cache_metric(metric: Metric):
+async def cache_metrics(metrics: Union[Metric, List[Metric]]):
     """
-    Cache incoming metric values with a timestamp.
-    Key format: "metric:{metric_name}"
+    Cache incoming metric values, supporting both single and multiple metrics.
     """
-    metric_dict = metric.model_dump()
+
+    if isinstance(metrics, Metric):
+        metrics = [metrics]
+
+    metrics_list = [metric.model_dump() for metric in metrics]
 
     try:
-        redis_metrics.store_metric_in_cache(metric_dict)
+        for metric_dict in metrics_list:
+            redis_metrics.store_metric_in_cache(metric_dict)
     except redis.RedisError:
-        raise HTTPException(status_code=503, detail="Redis is unavailable. Metric not cached.")
+        raise HTTPException(status_code=503, detail="Redis is unavailable. Metrics not cached.")
 
-    return {"message": "Metric cached"}
+    return {"message": "Metrics cached"}
 
 
 # TEST DEBUG

@@ -1,4 +1,5 @@
 from datetime import datetime
+import unittest
 import pytest
 import time
 import redis
@@ -133,4 +134,38 @@ def test_store_metric_redis_failure():
         response = client.post("/metrics/", json=metric)
 
     assert response.status_code == 503
-    assert response.json() == {"detail": "Redis is unavailable. Metric not cached."}
+    assert response.json() == {"detail": "Redis is unavailable. Metrics not cached."}
+
+
+def test_store_multiple_metrics_in_cache():
+    """Test storing multiple metrics in Redis via the API."""
+    metrics = [
+        {
+            "measurement": "cpu",
+            "tags": {"host": "server-1"},
+            "fields": {"usage": 90.3},
+            "timestamp": "2025-02-26T12:00:00Z",
+        },
+        {
+            "measurement": "memory",
+            "tags": {"host": "server-2"},
+            "fields": {"used": 4096},
+            "timestamp": "2025-02-26T12:01:00Z",
+        },
+    ]
+
+    with unittest.mock.patch("dao.redis.metrics.RedisMetrics.store_metric_in_cache") as mock_store:
+        response = client.post("/metrics/", json=metrics)
+
+        assert response.status_code == 200
+        assert response.json() == {"message": "Metrics cached"}
+
+        # Ensure `store_metric_in_cache` was called twice (once per metric)
+        assert mock_store.call_count == 2
+
+        # Extract call arguments
+        calls = [call[0][0] for call in mock_store.call_args_list]
+
+        # Verify that both metrics were processed
+        assert metrics[0] in calls
+        assert metrics[1] in calls

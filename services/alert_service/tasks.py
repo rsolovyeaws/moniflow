@@ -43,7 +43,7 @@ def process_metrics():
     Celery task that pulls metrics from Redis and processes them.
     """
     while True:
-        metric_data = redis_client.lpop("moniflow:metrics")
+        metric_data = None  # redis_client.lpop("moniflow:metrics")
 
         if metric_data is None:
             break
